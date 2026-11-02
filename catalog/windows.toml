@@ -1,0 +1,107 @@
+# Catálogo de ações — Windows 11. O backend Windows é da ETAPA 3: estas
+# definições já são validadas pelos testes, mas NÃO foram executadas em um
+# Windows real. O playbook do AME Wizard chamará o mesmo executável (prumo.exe)
+# com estas mesmas ações, para que app e playbook nunca divirjam.
+
+[[action]]
+id = "win.gamedvr.gravacao-em-segundo-plano"
+version = 1
+title = "Desligar a gravação em segundo plano do Xbox Game Bar"
+platform = "windows"
+area = "Jogos do Windows"
+tier = "advanced"
+evidence = "hypothesis"
+privilege = "user"
+restart = "app"
+problem = "A captura em segundo plano do Game Bar mantém gravação contínua quando ativada. Você usa NVIDIA Broadcast e Lightshot, não o Game Bar, para captura."
+compat = "Windows 11 (chaves do usuário atual)."
+when = "Se o diagnóstico mostrar a captura ativa."
+change = "HKCU\\System\\GameConfigStore GameDVR_Enabled=0 e HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR AppCaptureEnabled=0."
+benefit = "Hipótese: remove o custo de codificação contínua quando estava ligada. Sem medição."
+side_effects = "Atalho Win+Alt+R e clipes do Game Bar deixam de funcionar."
+undo = "Desfazer restaura os valores anteriores reais (ou apaga os valores se não existiam)."
+validation = "Configurações → Jogos → Capturas; frame time A/B no Valorant (campo de treino)."
+[[action.sources]]
+title = "ResetExplode WindowsTweaks.cs (referência de implementação, não de evidência de ganho)"
+url = "https://github.com/GustavoReset/ResetExplode/blob/main/WindowsTweaks.cs"
+consulted = "2026-11-01"
+says = "Usa as mesmas duas chaves para 'desativar Game DVR'."
+[[action.steps]]
+kind = "reg_set"
+path = "HKCU\\System\\GameConfigStore"
+name = "GameDVR_Enabled"
+value_type = "REG_DWORD"
+data = "0"
+[[action.steps]]
+kind = "reg_set"
+path = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR"
+name = "AppCaptureEnabled"
+value_type = "REG_DWORD"
+data = "0"
+
+[[action]]
+id = "win.hags.medir"
+version = 1
+title = "Agendamento de GPU acelerado por hardware (HAGS): medir, não presumir"
+platform = "windows"
+area = "Jogos do Windows"
+tier = "manual"
+evidence = "official_doc"
+privilege = "admin"
+restart = "reboot"
+problem = "Guias de otimização ligam ou desligam o HAGS como se fosse ganho garantido."
+compat = "Windows 11 com driver WDDM 2.7+."
+when = "Só como teste A/B com reinício entre as medições."
+change = "Nenhuma automática. Configurações → Sistema → Tela → Gráficos."
+benefit = "A Microsoft diz que a transição deve ser transparente e não promete ganho."
+side_effects = "Exige reinício; pode interagir com DLSS Frame Generation (não usado nas suas GPUs/jogos)."
+undo = "Voltar a opção e reiniciar."
+validation = "Frame time A/B no mesmo cenário."
+[[action.sources]]
+title = "DirectX Developer Blog — Hardware Accelerated GPU Scheduling"
+url = "https://devblogs.microsoft.com/directx/hardware-accelerated-gpu-scheduling/"
+consulted = "2026-11-01"
+says = "'The transition should be transparent, and users should not notice any significant changes.'"
+
+[[action]]
+id = "win.rejeitado.desligar-seguranca"
+version = 1
+title = "Desligar Integridade de Memória/VBS, Secure Boot ou TPM"
+platform = "windows"
+area = "Rejeitados"
+tier = "rejected"
+evidence = "rejected"
+privilege = "admin"
+restart = "reboot"
+problem = "Playbooks de desempenho costumam desligar VBS/HVCI."
+compat = "Windows 11."
+when = "Nunca: o Riot Vanguard pode exigir TPM 2.0, Secure Boot, Integridade de Memória e IOMMU."
+change = "Nenhuma. O diagnóstico só informa o estado."
+benefit = "Não compensa o risco de Valorant/LoL não abrirem (VAN: RESTRICTION) e de menor segurança."
+side_effects = "Jogos com Vanguard podem se recusar a iniciar."
+undo = "Não se aplica."
+validation = "Não se aplica."
+[[action.sources]]
+title = "Riot Support — Vanguard Security Requirements"
+url = "https://support.riotgames.com/en-us/riot/performance/vanguard-security-requirements"
+consulted = "2026-11-01"
+says = "'Riot Vanguard may require certain Windows security features to be enabled before launching Riot games': TPM 2.0, Secure Boot, Memory Integrity (HVCI/VBS), IOMMU."
+
+[[action]]
+id = "win.rejeitado.limpar-standby"
+version = 1
+title = "Esvaziar a lista de memória em espera (estilo ISLC)"
+platform = "windows"
+area = "Rejeitados"
+tier = "rejected"
+evidence = "rejected"
+privilege = "admin"
+restart = "none"
+problem = "Otimizadores esvaziam a memória em espera e os working sets."
+compat = "Windows."
+when = "Nunca no plano sem medição neste PC."
+change = "Nenhuma."
+benefit = "'RAM livre' não é ganho de desempenho; a memória em espera é cache reutilizável."
+side_effects = "Força releitura do disco e page faults depois."
+undo = "Não se aplica."
+validation = "Não se aplica."

@@ -1,0 +1,252 @@
+# Catálogo de ações — CachyOS / Linux.
+# Cada ação documenta os 10 itens exigidos (problem, compat, when, change,
+# benefit, side_effects, privilege/restart, undo, validation, sources).
+# Benefícios nunca trazem percentuais. "evidence" segue a classificação do
+# projeto; documentação de funcionamento NÃO é prova de ganho.
+
+[[action]]
+id = "linux.nvidia.glcache-tamanho"
+version = 1
+title = "Aumentar o limite do cache de shaders OpenGL da NVIDIA"
+platform = "linux"
+area = "Minecraft"
+tier = "recommended"
+evidence = "official_doc"
+privilege = "user"
+restart = "logout"
+problem = "Shaders compilados pelo driver ficam em ~/.cache/nvidia/GLCache. Quando o cache atinge o limite de tamanho, entradas antigas são descartadas e precisam ser recompiladas, o que pode aparecer como engasgo ao ver blocos/efeitos novos (Minecraft com shaders é o caso típico)."
+compat = "Driver NVIDIA proprietário ou open (testado com 615.78.08); sessão iniciada pelo systemd do usuário (niri-session lê ~/.config/environment.d)."
+when = "Só quando o cache atual está perto do limite. Neste PC o diagnóstico mediu 995 MB."
+conditions = ["gpu.vendor=nvidia", "nvidia.glcache_mb>=800"]
+change = "Cria ~/.config/environment.d/90-prumo-nvidia-shader-cache.conf com __GL_SHADER_DISK_CACHE_SIZE={{bytes}}. O README da NVIDIA recomenda definir a variável globalmente, porque programas abertos sem ela voltam ao tamanho padrão e podem apagar o excesso."
+benefit = "Menos recompilação de shaders já vistos depois que o cache enche. Não muda FPS médio; o efeito esperado, se houver, é em engasgos pontuais. Não medido neste PC."
+side_effects = "Usa mais espaço em disco (até o limite escolhido). Nenhum efeito em segurança."
+undo = "Desfazer a ação remove o arquivo; reabra a sessão. Manual: apague o arquivo citado."
+validation = "Após reabrir a sessão: `systemctl --user show-environment | grep __GL_SHADER` e, com o jogo aberto, `tr '\\0' '\\n' < /proc/$(pgrep -n java)/environ | grep __GL_SHADER`. Acompanhe `du -sh ~/.cache/nvidia/GLCache` passar de ~1 GB."
+[action.params.bytes]
+default = "10737418240"
+description = "Limite em bytes (4 GiB ou 10 GiB)"
+allowed = "enum:4294967296|10737418240"
+[[action.sources]]
+title = "NVIDIA Linux driver README, seção Shader Disk Cache (arquivo local /usr/share/doc/nvidia/README, 615.78.08)"
+url = "file:///usr/share/doc/nvidia/README"
+consulted = "2026-11-01"
+says = "__GL_SHADER_DISK_CACHE_SIZE (integer) configura o tamanho; 'To increase the cache size globally, __GL_SHADER_DISK_CACHE_SIZE can be set in e.g. ~/.bashrc or ~/.profile'; apps sem a variável revertem ao tamanho padrão e o cache é apagado se passar dele."
+[[action.steps]]
+kind = "write_file"
+path = "{{config}}/environment.d/90-prumo-nvidia-shader-cache.conf"
+content = "# Criado pelo Prumo (linux.nvidia.glcache-tamanho v1). Remova para desfazer.\n__GL_SHADER_DISK_CACHE_SIZE={{bytes}}\n"
+
+[[action]]
+id = "linux.minecraft.gtnh-jvm-oficial"
+version = 1
+title = "GTNH: memória e argumento JVM conforme o wiki oficial"
+platform = "linux"
+area = "Minecraft"
+tier = "recommended"
+evidence = "official_doc"
+privilege = "user"
+restart = "app"
+problem = "As instâncias GTNH herdam o padrão global do Prism (512 MB mínimo / 14096 MB máximo). O wiki do GTNH recomenda mínimo = máximo e 4–6 GB para single player com 16 de distância, e informa um argumento que reduz uso de memória no Java 25+."
+compat = "GTNH 2.8+ com Java 25+ (versão lwjgl3ify, Minecraft 1.7.10) no Prism Launcher. Não se aplica a MEGA nem a outros packs 1.7.10."
+when = "Instâncias GTNH com Java 25 ou mais novo. Bases muito grandes podem precisar de mais memória: ajuste o parâmetro e observe o uso de heap (F3)."
+conditions = []
+change = "No instance.cfg de cada instância GTNH selecionada: OverrideMemory=true, MinMemAlloc={{heap_mb}}, MaxMemAlloc={{heap_mb}}, OverrideJavaArgs=true, JvmArgs=-XX:+UseCompactObjectHeaders. O valor anterior de cada chave fica no diário da sessão."
+benefit = "Segue a configuração recomendada pelos mantenedores. O wiki afirma menor uso de memória no Java 25+; não há medição de FPS ou frame time publicada nem medida neste PC."
+side_effects = "Se a base exigir mais que o valor escolhido, o jogo pode ficar lento por coleta de lixo frequente ou fechar por falta de memória. Substitui argumentos JVM próprios da instância (o valor antigo aparece na prévia e é restaurado ao desfazer)."
+undo = "Desfazer a ação/sessão restaura cada chave do instance.cfg. Manual: no Prism, Editar instância → Configurações → Java, desmarque Memória e Argumentos."
+validation = "Abra a instância e confira no log do Prism a linha de comando (-Xms/-Xmx e -XX:+UseCompactObjectHeaders). No jogo, F3 mostra o heap; jogue a mesma base por 10 min sem fechar por memória."
+[action.params.heap_mb]
+default = "6144"
+description = "Memória mínima = máxima em MB (wiki: 4–6 GB para single player)"
+allowed = "int:4096:12288"
+[[action.sources]]
+title = "GTNH Wiki — Installing and Migrating"
+url = "https://wiki.gtnewhorizons.com/wiki/Installing_and_Migrating"
+consulted = "2026-11-01"
+says = "'4-6 GB of memory (min-max RAM) is recommended for Single Player (SP) on 16 render distance'; 'Assign the total memory allocation for both minimum and maximum'; 'Specifically for Java 25+, you can add -XX:+UseCompactObjectHeaders under JVM Arguments to reduce memory usage'; Prism 'does not require any additional Java arguments'."
+[[action.steps]]
+kind = "prism_instance"
+[action.steps.selector]
+minecraft = "1.7.10"
+requires_component = "lwjgl3ify"
+name_contains_any = ["GTNH", "New_Horizons", "New Horizons", "RC-2"]
+min_java = 25
+[action.steps.keys]
+OverrideMemory = "true"
+MinMemAlloc = "{{heap_mb}}"
+MaxMemAlloc = "{{heap_mb}}"
+OverrideJavaArgs = "true"
+JvmArgs = "-XX:+UseCompactObjectHeaders"
+
+[[action]]
+id = "linux.minecraft.gtl-heap-fixo"
+version = 1
+title = "GTL: memória mínima igual à máxima (experimental)"
+platform = "linux"
+area = "Minecraft"
+tier = "advanced"
+evidence = "hypothesis"
+privilege = "user"
+restart = "app"
+problem = "As instâncias GTL iniciam com 512 MB e crescem até ~14 GB. Hipótese: fixar o heap evita redimensionamentos durante o jogo."
+compat = "GregTech Leisure (Minecraft 1.20.1, Forge) no Prism Launcher. A página oficial do GTL não informa Java, memória nem argumentos recomendados."
+when = "Só para teste comparativo com medição antes/depois (mesma base, mesmo trajeto, com e sem OBS)."
+conditions = []
+change = "No instance.cfg das instâncias GTL: OverrideMemory=true, MinMemAlloc={{heap_mb}}, MaxMemAlloc={{heap_mb}}."
+benefit = "Desconhecido. Sem fonte do modpack; só vale manter se a medição mostrar menos picos de frame time fora do ruído."
+side_effects = "Reserva a memória inteira desde a abertura, o que reduz a RAM livre para OBS e navegador. Com 32 GB e outros Java abertos, pode aumentar o swap."
+undo = "Desfazer restaura as chaves do instance.cfg."
+validation = "Comparação A/B com o relatório de frame time (etapa de medição)."
+[action.params.heap_mb]
+default = "12288"
+description = "Memória mínima = máxima em MB"
+allowed = "int:6144:16384"
+[[action.sources]]
+title = "CurseForge — GregTech Leisure (página do projeto e arquivo 1.4.5.4)"
+url = "https://www.curseforge.com/minecraft/modpacks/gregtech-leisure"
+consulted = "2026-11-01"
+says = "Não informa Java, RAM, argumentos JVM nem orientação de shaders; por isso a ação é hipótese."
+[[action.steps]]
+kind = "prism_instance"
+[action.steps.selector]
+minecraft = "1.20.1"
+name_contains_any = ["GTL", "Leisure"]
+[action.steps.keys]
+OverrideMemory = "true"
+MinMemAlloc = "{{heap_mb}}"
+MaxMemAlloc = "{{heap_mb}}"
+
+[[action]]
+id = "linux.memoria.processos-em-segundo-plano"
+version = 1
+title = "Pressão de memória antes de jogar (orientação)"
+platform = "linux"
+area = "Diagnóstico"
+tier = "manual"
+evidence = "hypothesis"
+privilege = "user"
+restart = "none"
+problem = "O diagnóstico encontrou vários GB em swap (zram) com o jogo, OBS, navegador e outros processos Java abertos. Páginas em swap voltam para a RAM quando usadas, o que pode causar pausas."
+compat = "Qualquer Linux."
+when = "Quando o achado 'memoria.swap-alto' aparecer."
+change = "Nenhuma alteração automática. O app lista os maiores consumidores e você decide o que fechar; nada é encerrado pelo app (pode haver trabalho não salvo)."
+benefit = "Reduzir swap durante o jogo pode reduzir pausas; precisa de medição (frame time com e sem os processos)."
+side_effects = "Nenhum (só orientação)."
+undo = "Não se aplica."
+validation = "Compare `free -m` e o relatório de frame time com e sem os processos em segundo plano."
+[[action.sources]]
+title = "Linux kernel — PSI (Pressure Stall Information)"
+url = "https://docs.kernel.org/accounting/psi.html"
+consulted = "2026-11-01"
+says = "PSI mede o tempo em que tarefas ficam paradas esperando memória, I/O ou CPU; usado aqui só para descrever o estado."
+
+[[action]]
+id = "linux.obs.bitrate-youtube"
+version = 1
+title = "OBS: bitrate e resolução da live a partir do upload medido"
+platform = "linux"
+area = "OBS"
+tier = "manual"
+evidence = "official_doc"
+privilege = "user"
+restart = "app"
+problem = "O perfil atual do OBS transmite 1920×1080 a 60 FPS com NVENC H.264 CBR, mas não define bitrate no streamEncoder.json (o OBS usa o padrão do encoder). Sem o upload real, não dá para escolher um bitrate seguro."
+compat = "OBS 32 com NVENC (RTX 3060 Ti: H.264 e HEVC; sem AV1 por hardware)."
+when = "Depois de medir o upload (teste de rede guiado)."
+change = "Etapa futura do app: propor um perfil novo do OBS (cópia), sem tocar no perfil atual nem em service.json/chave de transmissão."
+benefit = "Bitrate dentro da faixa do YouTube e abaixo da capacidade real de upload reduz quadros perdidos por rede."
+side_effects = "Bitrate acima do upload sustentado causa quadros perdidos; abaixo do recomendado reduz a qualidade da live."
+undo = "O perfil novo é separado; basta voltar ao perfil 'Sem nome'."
+validation = "Estatísticas do OBS (quadros perdidos por rede, atraso de renderização, atraso de codificação) numa live de teste não listada."
+[[action.sources]]
+title = "YouTube Help — Choose live encoder settings, bitrates, and resolutions"
+url = "https://support.google.com/youtube/answer/2853702"
+consulted = "2026-11-01"
+says = "Tabela de bitrate por resolução/FPS para H.264 e para AV1/H.265; keyframe recomendado de 2 s (não passar de 4 s); CBR; áudio AAC 128 kbps estéreo."
+[[action.sources]]
+title = "NVIDIA Video Encode and Decode GPU Support Matrix"
+url = "https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new"
+consulted = "2026-11-01"
+says = "GeForce RTX 3060 Ti: Ampere, 1 NVENC, H.264 sim, HEVC sim, AV1 não."
+
+[[action]]
+id = "linux.scx.agendador"
+version = 1
+title = "Agendador sched_ext (scx) — avaliar com medição"
+platform = "linux"
+area = "Sistema"
+tier = "manual"
+evidence = "hypothesis"
+privilege = "admin"
+restart = "none"
+problem = "O kernel atual é linux-cachyos-bore (agendador BORE) e o scx_loader está instalado mas inativo. Agendadores sched_ext prometem melhor responsividade em alguns cenários, sem medição para este uso."
+compat = "Kernel com sched_ext (CachyOS) e pacote scx-scheds."
+when = "Só como teste A/B medido; trocar e voltar não exige reinício."
+change = "Nenhuma alteração automática nesta etapa. Teste manual: `sudo scx_loader --help` / scx-manager; voltar: parar o serviço."
+benefit = "Desconhecido para Minecraft + OBS neste PC."
+side_effects = "Comportamento diferente de agendamento; pode piorar alguns cenários."
+undo = "Parar o scx_loader volta ao BORE imediatamente."
+validation = "Relatório de frame time A/B com o mesmo trajeto."
+[[action.sources]]
+title = "CachyOS Wiki — sched-ext / scx"
+url = "https://wiki.cachyos.org/configuration/sched-ext/"
+consulted = "2026-11-01"
+says = "Página citada para o procedimento; não consultada em detalhe nesta etapa — conferir antes de automatizar."
+
+[[action]]
+id = "linux.rejeitado.limpar-ram"
+version = 1
+title = "Limpar RAM / drop_caches antes de jogar"
+platform = "linux"
+area = "Rejeitados"
+tier = "rejected"
+evidence = "rejected"
+privilege = "admin"
+restart = "none"
+problem = "Ferramentas de 'limpeza de RAM' esvaziam o cache de páginas."
+compat = "Linux."
+when = "Nunca no plano."
+change = "Nenhuma."
+benefit = "Nenhum demonstrado: o cache de páginas é liberado sob demanda pelo kernel; esvaziá-lo força releitura do disco (mais I/O e possíveis engasgos ao carregar chunks)."
+side_effects = "Mais leituras de disco logo depois."
+undo = "Não se aplica."
+validation = "Não se aplica."
+
+[[action]]
+id = "linux.rejeitado.mitigations-off"
+version = 1
+title = "Desativar mitigações de CPU (mitigations=off)"
+platform = "linux"
+area = "Rejeitados"
+tier = "rejected"
+evidence = "rejected"
+privilege = "admin"
+restart = "reboot"
+problem = "Pacotes de otimização às vezes desligam mitigações de vulnerabilidades da CPU."
+compat = "Linux."
+when = "Nunca no plano: reduz segurança sem medição que justifique neste uso."
+change = "Nenhuma."
+benefit = "Sem medição relevante para Minecraft/OBS neste PC."
+side_effects = "Expõe o sistema a vulnerabilidades conhecidas (navegador, código não confiável)."
+undo = "Não se aplica."
+validation = "Não se aplica."
+
+[[action]]
+id = "linux.rejeitado.tcp-generico"
+version = 1
+title = "Pacotes genéricos de 'otimização de TCP/DNS'"
+platform = "linux"
+area = "Rejeitados"
+tier = "rejected"
+evidence = "rejected"
+privilege = "admin"
+restart = "none"
+problem = "Listas prontas de sysctl de rede."
+compat = "Linux."
+when = "Nunca sem diagnóstico: a conexão é Ethernet 1 Gb/s (r8169) e o upload ainda não foi medido."
+change = "Nenhuma."
+benefit = "Nenhum demonstrado para este caso."
+side_effects = "Podem piorar latência ou estabilidade."
+undo = "Não se aplica."
+validation = "Não se aplica."
