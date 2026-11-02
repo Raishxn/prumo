@@ -47,6 +47,9 @@ pub struct Selection {
     pub ids: Option<Vec<String>>,
     /// Sobrescritas "id.param" → valor (validadas contra o catálogo).
     pub params: BTreeMap<String, String>,
+    /// Instâncias a deixar de fora: trecho do nome ou da pasta, sem diferenciar
+    /// maiúsculas (ex.: "[BACKUP]").
+    pub exclude_targets: Vec<String>,
 }
 
 pub fn base_vars() -> BTreeMap<String, String> {
@@ -77,9 +80,26 @@ pub fn plan(catalog: &[ActionDef], diag: &Diagnosis, sel: &Selection) -> Result<
     for def in catalog {
         let mut params = base_vars();
         for (k, p) in &def.params {
-            let v = sel.params.get(&format!("{}.{k}", def.id)).unwrap_or(&p.default).clone();
-            check_param(&v, &p.allowed).map_err(|e| anyhow::anyhow!("{}.{k}: {e}", def.id))?;
-            params.insert(k.clone(), v);
+            let v = match sel.params.get(&format!("{}.{k}", def.id)) {
+                Some(v) => {
+                    check_param(v, &p.allowed).map_err(|e| anyhow::anyhow!("{}.{k}: {e}", def.id))?;
+                    Some(v.clone())
+                }
+                None => match p.default.strip_prefix("fact:") {
+                    // Valor vindo do diagnóstico: se faltar ou for inválido, a
+                    // ação fica incompatível (não é erro do usuário).
+                    Some(key) => facts.get(key).filter(|v| check_param(v, &p.allowed).is_ok()).cloned(),
+                    None => Some(p.default.clone()),
+                },
+            };
+            match v {
+                Some(v) => {
+                    params.insert(k.clone(), v);
+                }
+                None => {
+                    params.insert(format!("!{k}"), p.default.clone());
+                }
+            }
         }
         let mut pa = PlannedAction { def: def.clone(), status: PlanStatus::Pending, params, ops: vec![], targets: vec![] };
         pa.status = if def.tier == Tier::Rejected {
@@ -90,8 +110,10 @@ pub fn plan(catalog: &[ActionDef], diag: &Diagnosis, sel: &Selection) -> Result<
             PlanStatus::NotSelected
         } else if let Some(c) = first_failed_condition(&def.conditions, &facts) {
             PlanStatus::Incompatible(format!("condição não atendida: {c}"))
+        } else if let Some((k, d)) = pa.params.iter().find(|(k, _)| k.starts_with('!')) {
+            PlanStatus::Incompatible(format!("parâmetro {} sem valor válido ({d}); informe com --param", &k[1..]))
         } else {
-            expand_steps(&mut pa, &diag.minecraft)
+            expand_steps(&mut pa, &diag.minecraft, &sel.exclude_targets)
         };
         if pa.status == PlanStatus::Pending && def.privilege == Privilege::Admin && !elevated {
             pa.status = PlanStatus::Blocked("requer administrador: rode novamente com privilégio elevado".into());
@@ -102,7 +124,7 @@ pub fn plan(catalog: &[ActionDef], diag: &Diagnosis, sel: &Selection) -> Result<
     Ok(out)
 }
 
-fn expand_steps(pa: &mut PlannedAction, instances: &[Instance]) -> PlanStatus {
+fn expand_steps(pa: &mut PlannedAction, instances: &[Instance], exclude: &[String]) -> PlanStatus {
     let mut ops = vec![];
     let mut blocked = vec![];
     for step in &pa.def.steps {
@@ -117,6 +139,10 @@ fn expand_steps(pa: &mut PlannedAction, instances: &[Instance]) -> PlanStatus {
                 section: section.clone(),
                 key: key.clone(),
                 value: expand(value, &pa.params),
+            }),
+            StepDef::CopyIfMissing { from, to } => ops.push(Op::CopyIfMissing {
+                from: PathBuf::from(expand(from, &pa.params)),
+                to: PathBuf::from(expand(to, &pa.params)),
             }),
             StepDef::RegSet { path, name, value_type, data } => ops.push(Op::RegSet {
                 path: path.clone(),
@@ -137,6 +163,12 @@ fn expand_steps(pa: &mut PlannedAction, instances: &[Instance]) -> PlanStatus {
                             })
                     })
                     .filter(|i| selector.min_java.is_none_or(|m| i.java_major.is_some_and(|j| j >= m)))
+                    .filter(|i| {
+                        !exclude.iter().any(|x| {
+                            let x = x.to_lowercase();
+                            i.name.to_lowercase().contains(&x) || i.folder.to_lowercase().contains(&x)
+                        })
+                    })
                     .collect();
                 for i in matches {
                     if i.running {

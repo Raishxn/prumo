@@ -69,6 +69,14 @@ fn norm(s: &str) -> String {
     if cfg!(windows) { s.to_lowercase() } else { s }
 }
 
+/// Interpreta a lista de linhas de comando dos processos (uma por linha).
+/// Lista vazia significa que a consulta falhou, pois o próprio processo que
+/// consulta sempre aparece nela: devolve `None` em vez de "nada rodando".
+pub fn parse_process_list(out: &str) -> Option<Vec<String>> {
+    let v: Vec<String> = out.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect();
+    (!v.is_empty()).then_some(v)
+}
+
 pub fn scan(root: &Path, running_cmdlines: &[String]) -> Vec<Instance> {
     let global = fs::read_to_string(root.join("prismlauncher.cfg")).unwrap_or_default();
     let mut out = vec![];
@@ -142,6 +150,13 @@ mod tests {
         assert_eq!(java_major("21.0.12.1"), Some(21));
         assert_eq!(java_major("26"), Some(26));
         assert_eq!(java_major("x"), None);
+    }
+
+    #[test]
+    fn empty_process_list_is_failure_not_nothing_running() {
+        assert_eq!(parse_process_list(""), None);
+        assert_eq!(parse_process_list(" \r\n\r\n"), None);
+        assert_eq!(parse_process_list("a b\r\n\r\nc\r\n").unwrap(), vec!["a b", "c"]);
     }
 
     #[test]

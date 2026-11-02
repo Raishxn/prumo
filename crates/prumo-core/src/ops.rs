@@ -18,6 +18,9 @@ pub enum Op {
     WriteFile { path: PathBuf, content: String, mode: Option<u32> },
     IniSet { path: PathBuf, section: Option<String>, key: String, value: String },
     RegSet { path: String, name: String, kind: String, data: String },
+    /// Copia `from` para `to` só se `to` não existir. O conteúdo nunca entra no
+    /// diário (usado para copiar service.json do OBS sem ler a chave).
+    CopyIfMissing { from: PathBuf, to: PathBuf },
 }
 
 /// Estado anterior real, guardado antes de qualquer alteração.
@@ -44,6 +47,7 @@ impl Op {
                 section.as_deref().unwrap_or("")
             ),
             Op::RegSet { path, name, kind, data } => format!("{path}\\{name} = {data} ({kind})"),
+            Op::CopyIfMissing { from, to } => format!("copiar {} → {}", from.display(), to.display()),
         }
     }
 
@@ -61,6 +65,7 @@ impl Op {
             Op::RegSet { .. } => crate::platform::reg_read(self)
                 .map(|v| v.map(|(d, _)| d).unwrap_or_else(|| "(ausente)".into()))
                 .unwrap_or_else(|e| format!("indisponível: {e}")),
+            Op::CopyIfMissing { to, .. } => if to.exists() { "já existe".into() } else { "não existe".into() },
         }
     }
 
@@ -76,6 +81,7 @@ impl Op {
             Op::RegSet { data, .. } => {
                 crate::platform::reg_read(self)?.is_some_and(|(d, _)| d == *data)
             }
+            Op::CopyIfMissing { to, .. } => to.exists(),
         })
     }
 
@@ -105,6 +111,12 @@ impl Op {
                     backup: Some(name),
                 })
             }
+            Op::CopyIfMissing { to, .. } => {
+                if to.exists() {
+                    bail!("destino já existe; não sobrescrevo {}", to.display());
+                }
+                Ok(PreState::FileAbsent)
+            }
             Op::RegSet { .. } => {
                 let prev = crate::platform::reg_read(self)?;
                 Ok(PreState::RegValue {
@@ -133,6 +145,17 @@ impl Op {
                 write_atomic(path, out.as_bytes())
             }
             Op::RegSet { .. } => crate::platform::reg_write(self, None),
+            Op::CopyIfMissing { from, to } => {
+                if to.exists() {
+                    bail!("destino já existe");
+                }
+                let bytes = fs::read(from).with_context(|| format!("ler {}", from.display()))?;
+                write_atomic(to, &bytes)?;
+                if let Some(m) = file_mode(from) {
+                    set_mode(to, m)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -143,6 +166,7 @@ impl Op {
             Op::WriteFile { content, .. } => sha256(content.as_bytes()),
             Op::IniSet { value, .. } => sha256(value.as_bytes()),
             Op::RegSet { data, .. } => sha256(data.as_bytes()),
+            Op::CopyIfMissing { from, .. } => fs::read(from).map(|b| sha256(&b)).unwrap_or_default(),
         }
     }
 
@@ -157,6 +181,7 @@ impl Op {
                 .ok()
                 .flatten()
                 .map(|(d, _)| sha256(d.as_bytes())),
+            Op::CopyIfMissing { to, .. } => fs::read(to).ok().map(|b| sha256(&b)),
         }
     }
 
@@ -166,6 +191,16 @@ impl Op {
             (Op::WriteFile { path, .. }, PreState::FileAbsent) => {
                 if path.exists() {
                     fs::remove_file(path)?;
+                }
+                Ok(())
+            }
+            (Op::CopyIfMissing { to, .. }, PreState::FileAbsent) => {
+                if to.exists() {
+                    fs::remove_file(to)?;
+                }
+                // Tira a pasta criada pela cópia; falha (e fica) se ainda tiver algo.
+                if let Some(dir) = to.parent() {
+                    let _ = fs::remove_dir(dir);
                 }
                 Ok(())
             }

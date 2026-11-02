@@ -17,12 +17,17 @@ USO
   prumo explicar <id>                 Documentação completa de uma ação
   prumo plano [opções] [--json]       Prévia: estado atual → alteração proposta
   prumo aplicar [opções] [--sim]      Aplica o plano (pede confirmação sem --sim)
+  prumo rede                          Mede latência, perda e upload (envia 75 MB
+                                      aleatórios ao teste público da Cloudflare)
+  prumo medir <csv...> [--html f] [--json]
+                                      Estatísticas de CSV do MangoHud/PresentMon
   prumo sessoes                       Sessões registradas
   prumo desfazer <sessão|ultima> [--acao <id>] [--forcar]
   prumo recuperar                     Procura sessões interrompidas
 
 OPÇÕES DE PLANO
   --acoes a,b,c        Exatamente estas ações (padrão: plano recomendado)
+  --excluir a,b        Deixa de fora instâncias com esse trecho no nome ou pasta
   --param id.nome=v    Ajusta um parâmetro validado da ação
   --usar-ponto-existente   (Windows) aceita ponto de restauração com menos de 24 h
 
@@ -51,7 +56,7 @@ fn parse() -> Result<Args> {
             "--json" | "--sim" | "--forcar" | "--usar-ponto-existente" => {
                 flags.insert(a, String::new());
             }
-            "--acoes" | "--acao" => {
+            "--acoes" | "--acao" | "--excluir" | "--html" => {
                 flags.insert(a, it.next().context("faltou o valor")?);
             }
             "--param" => {
@@ -103,6 +108,35 @@ fn run() -> Result<()> {
             }
         }
         "aplicar" => apply(&cat, &a)?,
+        "rede" => {
+            let m = prumo_core::net::measure(&state_dir(), &|s| println!("  {s}"))?;
+            let f = |v: Option<f64>, u: &str| v.map(|x| format!("{x:.1} {u}")).unwrap_or_else(|| "não medido".into());
+            println!("\nRoteador: {} · perda {}", f(m.gateway_rtt_ms, "ms"), f(m.gateway_loss_pct, "%"));
+            println!("1.1.1.1:  {} · jitter {} · perda {}", f(m.internet_rtt_ms, "ms"), f(m.internet_jitter_ms, "ms"), f(m.internet_loss_pct, "%"));
+            println!("Upload:   envios {:?} Mb/s → mínimo {} · mediana {}", m.upload_runs_mbps, f(m.upload_min_mbps, "Mb/s"), f(m.upload_median_mbps, "Mb/s"));
+            match m.upload_min_mbps.and_then(prumo_core::net::suggested_h264_1080p60_kbps) {
+                Some(k) => println!("Bitrate sugerido para live 1080p60 H.264: {k} kbps (≤70% do upload mínimo; YouTube: 6–17 Mbps)"),
+                None => println!("Upload insuficiente para 1080p60 H.264 no YouTube (mínimo 6 Mbps com folga)."),
+            }
+            println!("Método: {}", m.method);
+        }
+        "medir" => {
+            if a.pos.is_empty() {
+                bail!("informe ao menos um CSV");
+            }
+            let runs = a.pos.iter().map(|p| prumo_core::measure::load(std::path::Path::new(p))).collect::<Result<Vec<_>>>()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&runs)?);
+            } else {
+                for r in &runs {
+                    println!("{}: {:.1} FPS · 1% low {:.1} · p99 {:.1} ms · {} stutters ({:.1}/min) · {} quadros em {:.0} s", r.name, r.avg_fps, r.low_1pct_fps, r.p99_ms, r.stutters, r.stutters_per_min, r.frames, r.duration_s);
+                }
+            }
+            if let Some(f) = a.flags.get("--html") {
+                prumo_core::ops::write_atomic(std::path::Path::new(f), prumo_core::measure::html(&runs).as_bytes())?;
+                println!("Relatório: {f}");
+            }
+        }
         "sessoes" => {
             for s in list_sessions(&state_dir()) {
                 let applied = s.actions.iter().filter(|r| r.outcome == prumo_core::journal::Outcome::Applied).count();
@@ -137,6 +171,7 @@ fn build_plan(cat: &[prumo_core::model::ActionDef], a: &Args) -> Result<(diag::D
     let d = diag::collect();
     let sel = Selection {
         ids: a.flags.get("--acoes").map(|s| s.split(',').map(|x| x.trim().to_string()).collect()),
+        exclude_targets: a.flags.get("--excluir").map(|s| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()).unwrap_or_default(),
         params: a.params.clone(),
     };
     let plan = engine::plan(cat, &d, &sel)?;

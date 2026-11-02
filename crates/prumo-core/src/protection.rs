@@ -18,6 +18,7 @@ pub struct ProtectionOptions {
 
 pub fn prepare(plan: &[PlannedAction], session_id: &str, opts: &ProtectionOptions) -> Result<Vec<ProtectionRecord>> {
     let pending: Vec<&PlannedAction> = plan.iter().filter(|p| p.status == PlanStatus::Pending).collect();
+    #[cfg_attr(not(windows), allow(unused_mut))]
     let mut recs = vec![ProtectionRecord {
         kind: "backup-especifico".into(),
         verified: true,
@@ -36,12 +37,7 @@ pub fn prepare(plan: &[PlannedAction], session_id: &str, opts: &ProtectionOption
     {
         let _ = (session_id, opts);
         if pending.iter().any(|p| p.def.privilege == crate::model::Privilege::Admin) {
-            recs.push(ProtectionRecord {
-                kind: "snapshot".into(),
-                verified: false,
-                detail: "Snapshot Btrfs ainda não implementado (etapa 2); só backups específicos cobrem esta sessão.".into(),
-                at: crate::now_iso(),
-            });
+            anyhow::bail!("ações administrativas exigem snapshot Btrfs verificado, ainda não implementado. Nada foi alterado.");
         }
     }
     Ok(recs)

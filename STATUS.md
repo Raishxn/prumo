@@ -1,4 +1,4 @@
-# Status — 2026-11-01
+# Status — 2026-11-02
 
 ## Pronto e verificado (Linux, CachyOS)
 
@@ -15,7 +15,13 @@
 | Diagnóstico Linux real (sem inventar; desconhecidos com motivo) | executado neste PC, 1,5 s |
 | Prévia real do plano recomendado | executada neste PC (nada aplicado) |
 
-Total: **18 testes passando** (`cargo test`).
+| Cópia sem sobrescrever + edição + desfazer (formato do perfil do OBS); segredo fora do diário | teste em diretório temporário |
+| Parâmetro vindo do diagnóstico (`fact:`): ausente/inválido deixa a ação incompatível | teste |
+| Cálculo do bitrate e leitura do `ping` | testes unitários |
+
+`--excluir` foi conferido na prévia real.
+
+Total: **31 testes passando** (`cargo test`).
 
 ## Escrito, mas NÃO testado
 
@@ -26,10 +32,16 @@ Total: **18 testes passando** (`cargo test`).
 - Nenhuma ação foi aplicada de verdade neste PC ainda (só prévia). Para aplicar o
   plano recomendado no CachyOS: `prumo aplicar` (pede confirmação).
 
+- `prumo rede`: **nunca executado de verdade** (envia 75 MB à Cloudflare; aguarda sua
+  autorização). Até lá, o perfil do OBS aparece como incompatível no plano.
+- Perfil `Prumo Live 1080p60`: testado só em diretório temporário; nunca aberto no OBS.
+- Detecção de VRR pelo EDID: leitura testada com saídas escritas à mão, não com um EDID real.
+- Instâncias do Prism no Windows: `prism::scan` agora roda lá, com lista de processos via WMI; nunca executado em Windows real. Se a lista falhar, nenhuma instância entra no plano. Java aberto como administrador pode passar despercebido se o Prumo rodar sem elevação.
+
 ## Ainda não existe
 
-Interface gráfica, playbook AME, medição/relatório HTML, executor elevado, snapshot
-Btrfs, teste de rede, perfil do OBS, fluxo de drivers, ISO customizada. Ver
+Interface gráfica, playbook AME, executor elevado, snapshot
+Btrfs, fluxo de drivers, ISO customizada. Ver
 [ROADMAP.md](ROADMAP.md) e [TODO.md](TODO.md).
 
 ## Achados do diagnóstico deste PC

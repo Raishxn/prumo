@@ -136,6 +136,23 @@ pub fn derive_findings(d: &mut Diagnosis) {
             });
         }
     }
+    if d.get("display.vrr") == Some("not supported")
+        && d.get("display.connector").is_some_and(|c| c.starts_with("HDMI"))
+        && d.get("display.edid_freesync_amd") == Some("sim")
+        && d.get("display.edid_hdmi_vrr") == Some("não")
+    {
+        f.push(Finding {
+            id: "monitor.vrr-pela-hdmi".into(),
+            severity: "atenção".into(),
+            text: format!(
+                "O monitor anuncia faixa de {} e FreeSync (bloco AMD), mas não o VRR do HDMI 2.1. \
+                 A NVIDIA aceita G-SYNC Compatible por DisplayPort (Pascal+) e por HDMI só com VRR do \
+                 HDMI Forum, por isso o VRR está indisponível nesta conexão. Ver ação linux.monitor.vrr-displayport.",
+                d.get("display.edid_range").unwrap_or("?")
+            ),
+            based_on: vec!["display.vrr".into(), "display.connector".into(), "display.edid_freesync_amd".into(), "display.edid_hdmi_vrr".into()],
+        });
+    }
     if d.get("secureboot") == Some("desativado") {
         f.push(Finding {
             id: "boot.secureboot-off".into(),

@@ -4,9 +4,10 @@
 
 - [x] ~~L1 Secure Boot~~ — respondido: com Secure Boot ligado o rEFInd não inicia;
       o Windows é aberto pelo menu do firmware. → plano em `docs/SECURE-BOOT.md`.
-- [ ] L2 Qual instância GTNH (2.9.0 final? RC-2?) e qual GTL você joga de fato.
-- [ ] L3 O monitor (EDID "HKM M238W1F2556", vendido como TGT Altay T3H) tem entrada
-      DisplayPort? Hoje está em HDMI e o Niri informa VRR não suportado.
+- [x] ~~L2~~ — respondido: joga GTNH nas instâncias 2.9 RC e posteriores; GTL é o
+      GregTech Leisure Enhanced 2.9.2.
+- [x] ~~L3~~ — respondido: o monitor tem DisplayPort, mas está em HDMI. VRR depende de
+      trocar o cabo (ação `linux.monitor.vrr-displayport`).
 - [ ] L4 Live: resolução/FPS alvo, gravação simultânea, e autorização para medir upload
       em servidor público.
 - [ ] Modelos da fonte e do cooler.
@@ -21,21 +22,21 @@
 
 ## Etapa 2 (Linux)
 
-- [ ] Executor elevado via pkexec (só ids do catálogo + parâmetros validados).
+- [ ] Executor elevado via pkexec (só ids do catálogo + parâmetros validados). Aguarda a primeira ação admin aplicável; hoje nenhuma existe.
 - [ ] Snapshot Btrfs verificado antes de ações admin (layout: `@` em `/dev/sda6`).
-- [ ] Escolha de alvos por ação (`--alvos`), p.ex. excluir "[BACKUP] RC-2".
-- [ ] Teste de rede guiado (latência/jitter/perda, upload sob autorização).
-- [ ] Perfil novo do OBS (cópia; nunca ler/copiar `service.json`).
+- [x] Excluir alvos: `--excluir "[BACKUP]"` (vale para todas as ações do plano).
+- [ ] Executar `prumo rede` de verdade (código pronto; falta autorização) e conferir o bitrate sugerido.
+- [ ] Abrir o perfil `Prumo Live 1080p60` no OBS e validar numa live não listada.
 - [ ] Secure Boot: ler as fontes listadas e validar o caminho shim + MOK.
 
 ## Etapa 3 (Windows) — prioridade
 
 - [x] Compilar e rodar os testes do motor no Windows (CI windows-latest).
-- [ ] Diagnóstico: build, TPM, Secure Boot, VBS/HVCI, IOMMU, serviços/tarefas/appx
-      ausentes (inventário VainOS com origem "incerta").
+- [x] Diagnóstico escrito: build, TPM, Secure Boot, VBS/HVCI, Vanguard, spooler, WebView2, App Installer, inicialização, serviços desativados (falta testar em Windows real).
+- [ ] Diagnóstico: IOMMU, tarefas e appx ausentes.
 - [ ] Ponto de restauração: testar criação, limite de 24 h e proteção desativada.
 - [ ] Registro via reg.exe: testar ler/escrever/restaurar/apagar.
-- [ ] Detectar instância do Minecraft aberta no Windows (lista de processos; hoje só Linux).
+- [x] Detectar instância do Minecraft aberta no Windows (WMI; escrito, falta testar em Windows real).
 - [ ] Gerenciador de inicialização com descrição e reversão.
 
 ## Não esquecer

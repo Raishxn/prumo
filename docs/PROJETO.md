@@ -191,7 +191,7 @@ Legenda de evidência: **DOC** documentação oficial do funcionamento (não pro
 | Etapa | Entrega | Aceite |
 |---|---|---|
 | **1** ✅ | Núcleo Rust, catálogo v1, diagnóstico Linux, CLI, diário, desfazer, testes | `cargo test` verde; diagnóstico real sem inventar valores; prévia real correta |
-| 2 | Linux completo: executor elevado (pkexec), snapshot Btrfs verificado, teste de rede/upload, escolha de alvos (instâncias), perfil novo do OBS (cópia, sem chave) | aplicar → reiniciar → validar → desfazer no seu CachyOS |
+| 2 | Linux completo: executor elevado (pkexec), snapshot Btrfs verificado, teste de rede/upload, escolha de alvos (instâncias), perfil novo do OBS (cópia, incluindo `service.json` com a chave, por decisão do usuário em 2026-11-02) | aplicar → reiniciar → validar → desfazer no seu CachyOS |
 | 3 | Backend Windows: diagnóstico (WMI, Vanguard/segurança, inventário VainOS), ponto de restauração verificado, registro, inicialização | rodado por você no Windows com o roteiro de validação |
 | 4 | Playbook AME (dois cenários: limpo / existente com VainOS) chamando o mesmo `prumo.exe` | validação contra a doc do AME + teste em VM Windows 11 |
 | 5 | Medição: MangoHud (Linux) e PresentMon (Windows) → estatísticas, definição de stutter, relatório HTML offline, export JSON/CSV | relatório com dados reais ou "não medido" |

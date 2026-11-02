@@ -56,12 +56,14 @@ pub fn validate(all: &[ActionDef]) -> Result<()> {
             bail!("{}: sem fontes", a.id);
         }
         for (k, p) in &a.params {
-            check_param(&p.default, &p.allowed).with_context(|| format!("{}: padrão inválido de {k}", a.id))?;
+            if !p.default.starts_with("fact:") {
+                check_param(&p.default, &p.allowed).with_context(|| format!("{}: padrão inválido de {k}", a.id))?;
+            }
         }
         if a.privilege == Privilege::Admin {
             for s in &a.steps {
                 let path = match s {
-                    StepDef::WriteFile { path, .. } | StepDef::IniSet { path, .. } => path.as_str(),
+                    StepDef::WriteFile { path, .. } | StepDef::IniSet { path, .. } | StepDef::CopyIfMissing { to: path, .. } => path.as_str(),
                     _ => continue,
                 };
                 if path.contains("{{home}}") || path.contains("{{config}}") {

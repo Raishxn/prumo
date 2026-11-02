@@ -196,6 +196,93 @@ fn backup_tamper_is_detected_on_restore() {
 fn invalid_param_override_is_rejected() {
     let mut a = action("a", vec![]);
     a.params.insert("heap".into(), ParamDef { default: "6144".into(), description: "".into(), allowed: "int:4096:12288".into() });
-    let sel = Selection { ids: Some(vec!["a".into()]), params: [("a.heap".to_string(), "999999".to_string())].into() };
+    let sel = Selection { exclude_targets: vec![], ids: Some(vec!["a".into()]), params: [("a.heap".to_string(), "999999".to_string())].into() };
     assert!(engine::plan(&[a], &Diagnosis::default(), &sel).is_err());
+}
+
+fn copy(from: &Path, to: &Path) -> StepDef {
+    StepDef::CopyIfMissing { from: from.to_string_lossy().into(), to: to.to_string_lossy().into() }
+}
+
+/// Mesmo formato da ação do perfil do OBS: copia, edita a cópia, grava outro
+/// arquivo. O desfazer precisa deixar a origem intacta e remover o que criou.
+#[test]
+fn copy_edit_undo_keeps_source_and_journal_has_no_secret() {
+    let t = tempfile::tempdir().unwrap();
+    let (src, dst) = (t.path().join("Sem_nome"), t.path().join("Novo"));
+    fs::create_dir_all(&src).unwrap();
+    let secret = "CHAVE-SECRETA-123";
+    fs::write(src.join("basic.ini"), "[General]\nName=Sem nome\n").unwrap();
+    fs::write(src.join("service.json"), secret).unwrap();
+    let cat = vec![action(
+        "a",
+        vec![
+            copy(&src.join("basic.ini"), &dst.join("basic.ini")),
+            copy(&src.join("service.json"), &dst.join("service.json")),
+            ini(&dst.join("basic.ini"), "Name", "Novo"),
+            write(&dst.join("streamEncoder.json"), "{}"),
+        ],
+    )];
+    let state = t.path().join("state");
+    let (mut s, r) = run(&cat, &state);
+    assert_eq!(r[0].outcome, Outcome::Applied, "{:?}", r[0]);
+    assert!(fs::read_to_string(dst.join("basic.ini")).unwrap().contains("Name=Novo"));
+    assert_eq!(fs::read_to_string(dst.join("service.json")).unwrap(), secret);
+
+    for e in walk(&state) {
+        let bytes = fs::read(&e).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains(secret), "segredo em {}", e.display());
+    }
+
+    engine::undo(&mut s, None, false).unwrap();
+    assert!(!dst.join("basic.ini").exists());
+    assert!(!dst.join("service.json").exists());
+    assert!(!dst.join("streamEncoder.json").exists());
+    assert!(!dst.exists(), "pasta criada pela cópia deve sair");
+    assert_eq!(fs::read_to_string(src.join("service.json")).unwrap(), secret);
+    assert_eq!(fs::read_to_string(src.join("basic.ini")).unwrap(), "[General]\nName=Sem nome\n");
+}
+
+fn walk(d: &Path) -> Vec<std::path::PathBuf> {
+    let mut v = vec![];
+    for e in fs::read_dir(d).unwrap().flatten() {
+        let p = e.path();
+        if p.is_dir() { v.extend(walk(&p)) } else { v.push(p) }
+    }
+    v
+}
+
+#[test]
+fn fact_param_uses_diagnosis_or_marks_incompatible() {
+    let t = tempfile::tempdir().unwrap();
+    let mut a = action("a", vec![write(&t.path().join("x"), "{{b}}")]);
+    a.params.insert("b".into(), ParamDef { default: "fact:obs.k".into(), description: "d".into(), allowed: "int:6000:17000".into() });
+    let cat = vec![a];
+    let status = |d: &Diagnosis| engine::plan(&cat, d, &Selection::default()).unwrap().remove(0);
+
+    let none = status(&Diagnosis::default());
+    assert!(matches!(none.status, PlanStatus::Incompatible(_)), "{:?}", none.status);
+
+    let mut bad = Diagnosis::default();
+    bad.known("obs.k", "100", "t");
+    assert!(matches!(status(&bad).status, PlanStatus::Incompatible(_)));
+
+    let mut ok = Diagnosis::default();
+    ok.known("obs.k", "9000", "t");
+    let p = status(&ok);
+    assert!(matches!(p.status, PlanStatus::Pending), "{:?}", p.status);
+    assert_eq!(p.params["b"], "9000");
+}
+
+#[cfg(unix)]
+#[test]
+fn admin_session_refused_without_verified_snapshot() {
+    let t = tempfile::tempdir().unwrap();
+    let mut a = action("a", vec![write(&t.path().join("x"), "1")]);
+    a.privilege = Privilege::Admin;
+    let mut plan = engine::plan(&[a], &Diagnosis::default(), &Selection::default()).unwrap();
+    plan[0].status = PlanStatus::Pending; // como ficaria rodando elevado
+    let e = prumo_core::protection::prepare(&plan, "s", &Default::default()).unwrap_err();
+    assert!(e.to_string().contains("snapshot"));
+    assert!(!t.path().join("x").exists());
 }

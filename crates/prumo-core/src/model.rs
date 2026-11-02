@@ -97,6 +97,8 @@ pub struct Source {
 /// privilegiado só aceita valores que passem por `allowed`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParamDef {
+    /// Valor fixo, ou "fact:<chave>" para usar um valor do diagnóstico
+    /// (ex.: bitrate sugerido a partir do upload medido).
     pub default: String,
     pub description: String,
     /// Validação: "int:MIN:MAX" ou "enum:a|b|c".
@@ -144,6 +146,8 @@ pub enum StepDef {
         selector: InstanceSelector,
         keys: BTreeMap<String, String>,
     },
+    /// Copia um arquivo só se o destino não existir (conteúdo fora do diário).
+    CopyIfMissing { from: String, to: String },
     /// Valor de registro do Windows (backend Windows).
     RegSet {
         path: String,

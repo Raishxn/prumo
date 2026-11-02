@@ -152,7 +152,24 @@ pub fn collect(d: &mut Diagnosis) {
         }
     }
     d.opt("net.links", (!nets.is_empty()).then(|| nets.join("; ")), "/sys/class/net", "nenhum link físico ativo");
-    d.unknown("net.upload_mbps", "não medido; use o teste de rede guiado (etapa de rede) antes de definir bitrate");
+    match crate::net::load_latest(&crate::state_dir()) {
+        Some(m) if m.upload_min_mbps.is_some() => {
+            let up = m.upload_min_mbps.unwrap_or_default();
+            let src = format!("prumo rede em {} (mínimo de {} envios)", m.at, m.upload_runs_mbps.len());
+            d.known("net.upload_mbps", format!("{up:.1}"), &src);
+            d.opt("net.upload_measured_at", Some(m.at.clone()), "prumo rede", "?");
+            d.opt("net.internet_rtt_ms", m.internet_rtt_ms.map(|v| format!("{v:.1}")), &src, "não medido");
+            d.opt("net.internet_jitter_ms", m.internet_jitter_ms.map(|v| format!("{v:.1}")), &src, "não medido");
+            d.opt("net.internet_loss_pct", m.internet_loss_pct.map(|v| format!("{v:.1}")), &src, "não medido");
+            d.opt(
+                "obs.suggested_bitrate_kbps",
+                crate::net::suggested_h264_1080p60_kbps(up).map(|v| v.to_string()),
+                "70% do upload mínimo medido, limitado a 6–17 Mbps (YouTube H.264 1080p60)",
+                "upload medido insuficiente para o mínimo do YouTube em 1080p60 H.264 (6 Mbps)",
+            );
+        }
+        _ => d.unknown("net.upload_mbps", "não medido; rode `prumo rede` (envia dados aleatórios ao teste público da Cloudflare)"),
+    }
 
     // Sessão gráfica
     d.opt("session.type", std::env::var("XDG_SESSION_TYPE").ok(), "XDG_SESSION_TYPE", "não definido");
@@ -165,6 +182,7 @@ pub fn collect(d: &mut Diagnosis) {
         d.opt("display.mode", mode, "niri msg outputs", "?");
         d.opt("display.vrr", vrr, "niri msg outputs", "?");
     }
+    edid(d);
     d.opt("niri.version", run("niri", &["--version"]), "niri --version", "niri ausente");
 
     // Agendamento e energia
@@ -228,6 +246,37 @@ fn pcie_link(d: &mut Diagnosis) {
     }
 }
 
+/// Faixa de atualização e blocos de VRR anunciados pelo monitor (EDID), via
+/// edid-decode quando instalado.
+fn edid(d: &mut Diagnosis) {
+    let Ok(rd) = fs::read_dir("/sys/class/drm") else { return };
+    for e in rd.flatten() {
+        let p = e.path();
+        if read(&p.join("status").to_string_lossy()).as_deref() != Some("connected") {
+            continue;
+        }
+        let conn = e.file_name().to_string_lossy().to_string();
+        d.known("display.connector", conn.split_once('-').map(|x| x.1).unwrap_or(&conn), "/sys/class/drm");
+        let Some(out) = run("edid-decode", &[&p.join("edid").to_string_lossy()]) else {
+            d.unknown("display.edid_range", "edid-decode não instalado");
+            return;
+        };
+        let (range, amd, hdmi_vrr) = parse_edid(&out);
+        d.opt("display.edid_range", range, "EDID (edid-decode)", "EDID sem faixa de atualização");
+        d.known("display.edid_freesync_amd", if amd { "sim" } else { "não" }, "EDID: bloco AMD (FreeSync)");
+        d.known("display.edid_hdmi_vrr", if hdmi_vrr { "sim" } else { "não" }, "EDID: VRR do HDMI Forum (HDMI 2.1)");
+        return;
+    }
+}
+
+/// (faixa de atualização, bloco AMD/FreeSync, VRR do HDMI Forum)
+fn parse_edid(out: &str) -> (Option<String>, bool, bool) {
+    let range = out.lines().find(|l| l.contains("Monitor ranges")).and_then(|l| l.split_once(':')).map(|x| x.1.trim().to_string());
+    let amd = out.contains("Vendor-Specific Data Block (AMD)");
+    let hdmi_vrr = out.lines().any(|l| l.contains("VRRmin") || l.contains("VRRmax"));
+    (range, amd, hdmi_vrr)
+}
+
 fn java_version_stderr() -> Option<String> {
     let o = std::process::Command::new("java").arg("-version").output().ok()?;
     String::from_utf8_lossy(&o.stderr).lines().next().map(String::from)
@@ -279,4 +328,31 @@ fn process_cmdlines() -> Vec<String> {
         .map(|b| String::from_utf8_lossy(&b).replace('\0', " "))
         .filter(|c| c.contains("java"))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_edid;
+
+    #[test]
+    fn edid_with_freesync_block() {
+        let out = "  Display Range Limits:\n    Monitor ranges (GTF): 48-165 Hz V, 30-255 kHz H\n  Vendor-Specific Data Block (AMD), OUI 00-00-1A:\n";
+        let (r, amd, hdmi) = parse_edid(out);
+        assert_eq!(r.as_deref(), Some("48-165 Hz V, 30-255 kHz H"));
+        assert!(amd);
+        assert!(!hdmi);
+    }
+
+    #[test]
+    fn edid_with_hdmi_forum_vrr() {
+        let (r, amd, hdmi) = parse_edid("    VRRmin: 48 Hz\n    VRRmax: 144 Hz\n");
+        assert_eq!(r, None);
+        assert!(!amd);
+        assert!(hdmi);
+    }
+
+    #[test]
+    fn edid_without_vrr() {
+        assert_eq!(parse_edid("Block 0, Base EDID:\n"), (None, false, false));
+    }
 }
