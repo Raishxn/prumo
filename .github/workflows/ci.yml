@@ -19,4 +19,6 @@ jobs:
           path: |
             target/release/prumo
             target/release/prumo.exe
+            target/release/prumo-gui
+            target/release/prumo-gui.exe
           if-no-files-found: ignore

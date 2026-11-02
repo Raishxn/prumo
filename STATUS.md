@@ -38,9 +38,13 @@ Total: **31 testes passando** (`cargo test`).
 - Detecção de VRR pelo EDID: leitura testada com saídas escritas à mão, não com um EDID real.
 - Instâncias do Prism no Windows: `prism::scan` agora roda lá, com lista de processos via WMI; nunca executado em Windows real. Se a lista falhar, nenhuma instância entra no plano. Java aberto como administrador pode passar despercebido se o Prumo rodar sem elevação.
 
+## Interface gráfica (`prumo-gui`)
+
+Páginas Início, Diagnóstico, Plano e Histórico. Abriu no Niri/Wayland; aplicar e desfazer pela interface nunca foram clicados. Compartilha `engine::apply_protected` com a CLI. Memória medida ~5 s após abrir: 167 MB (meta de 60 MB **não atingida**). Binário Linux: 7,5 MB. No Windows nunca foi aberta.
+
 ## Ainda não existe
 
-Interface gráfica, playbook AME, executor elevado, snapshot
+Medição e rede na interface, playbook AME, executor elevado, snapshot
 Btrfs, fluxo de drivers, ISO customizada. Ver
 [ROADMAP.md](ROADMAP.md) e [TODO.md](TODO.md).
 

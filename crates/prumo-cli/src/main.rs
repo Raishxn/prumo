@@ -196,20 +196,8 @@ fn apply(cat: &[prumo_core::model::ActionDef], a: &Args) -> Result<()> {
             return Ok(());
         }
     }
-    let mut session = Session::create(&state_dir(), "app")?;
     let opts = protection::ProtectionOptions { accept_recent_restore_point: a.flags.contains_key("--usar-ponto-existente") };
-    match protection::prepare(&plan, &session.id, &opts) {
-        Ok(recs) => {
-            session.protection = recs;
-            session.save()?;
-        }
-        Err(e) => {
-            session.finished = true;
-            session.save()?;
-            bail!("proteção obrigatória falhou; sessão interrompida antes de qualquer alteração.\n{e:#}");
-        }
-    }
-    let recs = engine::apply(&plan, &mut session)?;
+    let (session, recs) = engine::apply_protected(&plan, "app", &opts)?;
     println!("\nSessão {} ({}):", session.id, session.dir.display());
     for r in &recs {
         println!("  [{}] {} — {}", r.outcome.label(), r.action_id, r.detail);

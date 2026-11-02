@@ -9,7 +9,7 @@ Critérios de aceite detalhados em [docs/PROJETO.md §7](docs/PROJETO.md#7-etapa
 | 3 | Backend Windows: diagnóstico WMI/segurança/Vanguard, inventário VainOS, ponto de restauração verificado, registro, inicialização | 🔜 prioridade (troca para o Windows) |
 | 4 | Playbook AME Wizard: cenário limpo e cenário existente (VainOS), chamando o mesmo `prumo.exe` | planejada |
 | 5 | Medição: MangoHud/PresentMon → estatísticas, stutter definido, relatório HTML offline, JSON (`prumo medir`) | 🚧 cálculo pronto; falta CSV real e saída CSV |
-| 6 | Interface egui em português (todas as páginas) | planejada |
+| 6 | Interface egui em português (todas as páginas) | 🚧 Início, Diagnóstico, Plano e Histórico; faltam Rede e Medição; meta de RAM não atingida |
 | 7 | Drivers guiados, periféricos (OP1 8K), BIOS/PBO manual, empacotamento e desinstalação | planejada |
 | 8 | **ISO Windows 11 customizada leve** (estilo tiny11), compatível com Vanguard | planejada |
 

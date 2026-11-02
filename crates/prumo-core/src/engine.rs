@@ -235,6 +235,25 @@ fn resolve_relations(plan: &mut [PlannedAction]) {
 
 /// Aplica as ações pendentes. Cada ação é atômica: se uma operação falhar,
 /// as anteriores da mesma ação são revertidas na hora.
+/// Cria a sessão, exige a proteção e só então aplica. É o único caminho de
+/// aplicação da CLI e da interface, para que não possam divergir.
+pub fn apply_protected(plan: &[PlannedAction], origin: &str, opts: &crate::protection::ProtectionOptions) -> Result<(Session, Vec<ActionRecord>)> {
+    let mut session = Session::create(&crate::state_dir(), origin)?;
+    match crate::protection::prepare(plan, &session.id, opts) {
+        Ok(recs) => {
+            session.protection = recs;
+            session.save()?;
+        }
+        Err(e) => {
+            session.finished = true;
+            session.save()?;
+            bail!("proteção obrigatória falhou; sessão interrompida antes de qualquer alteração.\n{e:#}");
+        }
+    }
+    let recs = apply(plan, &mut session)?;
+    Ok((session, recs))
+}
+
 pub fn apply(plan: &[PlannedAction], session: &mut Session) -> Result<Vec<ActionRecord>> {
     let mut records = vec![];
     let mut failed: HashSet<String> = HashSet::new();
