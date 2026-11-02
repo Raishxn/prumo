@@ -11,7 +11,7 @@ Critérios de aceite detalhados em [docs/PROJETO.md §7](docs/PROJETO.md#7-etapa
 | 5 | Medição: MangoHud/PresentMon → estatísticas, stutter definido, relatório HTML offline, JSON (`prumo medir`) | 🚧 cálculo pronto; falta CSV real e saída CSV |
 | 6 | Interface egui em português (todas as páginas) | 🚧 Início, Diagnóstico, Plano e Histórico; faltam Rede e Medição; meta de RAM não atingida |
 | 7 | Drivers guiados, periféricos (OP1 8K), BIOS/PBO manual, empacotamento e desinstalação | planejada |
-| 8 | **ISO Windows 11 customizada leve** (estilo tiny11), compatível com Vanguard | planejada |
+| 8 | **ISO Windows 11 customizada leve** (estilo tiny11), compatível com Vanguard | 🚧 script em `iso/`, nunca testado |
 
 ## Etapa 8 — ISO customizada (anotado a pedido, 2026-11-01)
 

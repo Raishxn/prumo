@@ -48,6 +48,8 @@ fn windows_restore_point(session_id: &str, opts: &ProtectionOptions) -> Result<P
     use anyhow::bail;
     let ps = |c: &str| crate::diag::run("powershell", &["-NoProfile", "-NonInteractive", "-Command", c]).map(|s| s.trim().to_string());
     let last = || ps("(Get-ComputerRestorePoint | Sort-Object SequenceNumber | Select-Object -Last 1 | ForEach-Object { \"$($_.SequenceNumber)|$($_.Description)|$($_.CreationTime)\" })");
+    // Em instalação limpa a Proteção do Sistema costuma vir desligada.
+    let _ = ps("Enable-ComputerRestore -Drive \"$env:SystemDrive\\\"");
     let before = last();
     let desc = format!("Prumo {session_id}");
     let created = ps(&format!(

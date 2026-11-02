@@ -1,0 +1,29 @@
+# Apps pré-instalados removidos no fim da instalação. Um prefixo por linha,
+# com o motivo. Fora daqui nada é removido.
+# Mantidos de propósito: Store, App Installer, WebView2, VCLibs, Defender, Xbox Game Bar/identidade (jogos).
+Clipchamp.Clipchamp            # editor de vídeo, não usado
+Microsoft.BingNews             # Notícias
+Microsoft.BingWeather          # Clima
+Microsoft.BingSearch           # busca Bing
+Microsoft.GetHelp              # Obter Ajuda
+Microsoft.MicrosoftOfficeHub   # propaganda do Microsoft 365; usa Office 2010
+Microsoft.MicrosoftSolitaireCollection  # Paciência
+Microsoft.MicrosoftStickyNotes # Notas Autoadesivas
+Microsoft.Todos                # To Do
+Microsoft.WindowsFeedbackHub   # Hub de Comentários
+Microsoft.WindowsMaps          # Mapas
+Microsoft.WindowsSoundRecorder # Gravador de Som
+Microsoft.YourPhone            # Vincular ao Celular
+Microsoft.ZuneMusic            # Reprodutor Multimídia
+MSTeams                        # Teams
+Microsoft.Copilot              # Copilot
+Microsoft.GamingApp            # app Xbox; a identidade Xbox fica
+Microsoft.Getstarted           # Dicas
+Microsoft.OutlookForWindows    # novo Outlook
+Microsoft.People               # Pessoas
+Microsoft.PowerAutomateDesktop # automação, não usado
+Microsoft.Windows.DevHome      # Dev Home
+Microsoft.WindowsAlarms        # Relógio
+Microsoft.ZuneVideo            # Filmes e TV
+MicrosoftCorporationII.MicrosoftFamily  # Família
+MicrosoftCorporationII.QuickAssist      # Assistência Rápida
