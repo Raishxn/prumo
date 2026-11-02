@@ -7,7 +7,6 @@
 
 use crate::engine::{PlanStatus, PlannedAction};
 use crate::journal::ProtectionRecord;
-use crate::model::Privilege;
 use anyhow::Result;
 
 #[derive(Debug, Default, Clone)]
@@ -36,7 +35,7 @@ pub fn prepare(plan: &[PlannedAction], session_id: &str, opts: &ProtectionOption
     #[cfg(not(windows))]
     {
         let _ = (session_id, opts);
-        if pending.iter().any(|p| p.def.privilege == Privilege::Admin) {
+        if pending.iter().any(|p| p.def.privilege == crate::model::Privilege::Admin) {
             recs.push(ProtectionRecord {
                 kind: "snapshot".into(),
                 verified: false,

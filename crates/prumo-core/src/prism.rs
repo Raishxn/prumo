@@ -63,6 +63,12 @@ pub fn java_major(v: &str) -> Option<u32> {
     }
 }
 
+/// Normaliza separadores (e caixa, no Windows) para comparar caminhos.
+fn norm(s: &str) -> String {
+    let s = s.replace('\\', "/");
+    if cfg!(windows) { s.to_lowercase() } else { s }
+}
+
 pub fn scan(root: &Path, running_cmdlines: &[String]) -> Vec<Instance> {
     let global = fs::read_to_string(root.join("prismlauncher.cfg")).unwrap_or_default();
     let mut out = vec![];
@@ -102,7 +108,7 @@ pub fn scan(root: &Path, running_cmdlines: &[String]) -> Vec<Instance> {
             ini::get(&global, Some("General"), "JvmArgs").or_else(|| ini::get(&global, None, "JvmArgs"))
         };
         let java_version = g("JavaVersion");
-        let dir_s = dir.to_string_lossy().to_string();
+        let dir_s = norm(&dir.to_string_lossy());
         out.push(Instance {
             name: g("name").unwrap_or_else(|| folder.clone()),
             folder,
@@ -117,7 +123,7 @@ pub fn scan(root: &Path, running_cmdlines: &[String]) -> Vec<Instance> {
             max_mem_mb: mem("MaxMemAlloc"),
             override_java_args,
             jvm_args,
-            running: running_cmdlines.iter().any(|c| c.contains(&dir_s)),
+            running: running_cmdlines.iter().any(|c| norm(c).contains(&dir_s)),
             dir,
         });
     }

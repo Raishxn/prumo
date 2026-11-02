@@ -30,11 +30,12 @@
 
 ## Etapa 3 (Windows) — prioridade
 
-- [ ] `cargo check --target x86_64-pc-windows-msvc` no Windows; testes do motor lá.
+- [x] Compilar e rodar os testes do motor no Windows (CI windows-latest).
 - [ ] Diagnóstico: build, TPM, Secure Boot, VBS/HVCI, IOMMU, serviços/tarefas/appx
       ausentes (inventário VainOS com origem "incerta").
 - [ ] Ponto de restauração: testar criação, limite de 24 h e proteção desativada.
 - [ ] Registro via reg.exe: testar ler/escrever/restaurar/apagar.
+- [ ] Detectar instância do Minecraft aberta no Windows (lista de processos; hoje só Linux).
 - [ ] Gerenciador de inicialização com descrição e reversão.
 
 ## Não esquecer

@@ -20,7 +20,9 @@ Total: **18 testes passando** (`cargo test`).
 ## Escrito, mas NÃO testado
 
 - Backend Windows (registro via `reg.exe`, diagnóstico WMI, ponto de restauração
-  verificado): código existe, **não compilado nem executado em Windows**.
+  verificado): **compila e os 18 testes passam no Windows do CI** (GitHub Actions,
+  windows-latest), mas essas funções específicas **nunca rodaram num Windows real**
+  (o CI não cria ponto de restauração nem altera registro).
 - Nenhuma ação foi aplicada de verdade neste PC ainda (só prévia). Para aplicar o
   plano recomendado no CachyOS: `prumo aplicar` (pede confirmação).
 
